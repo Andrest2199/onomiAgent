@@ -73,24 +73,26 @@ async def transcribe_audio(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/retrieve_messages")
-async def get_messages(thread_id: str):
+async def get_messages(conversation_id: str = ""):
     try:
         from utils.messages import retrieve_messages_thread
 
-        if not thread_id.strip():
+        conversation_id = conversation_id
+
+        if not conversation_id.strip():
             raise HTTPException(
                 status_code=400,
-                detail="No Se Proporcionó Ningun ID de Hilo de Conversación",
+                detail="No se proporcionó ningún ID de conversación.",
             )
 
-        if not isinstance(thread_id, str):
+        if not isinstance(conversation_id, str):
             raise HTTPException(
-                status_code=400, detail="El ID de Thread debe ser una cadena de texto"
+                status_code=400,
+                detail="El ID de conversación debe ser una cadena de texto.",
             )
 
-        data = retrieve_messages_thread(thread_id)
+        data = retrieve_messages_thread(conversation_id)
 
         if "error" in data:
             raise HTTPException(status_code=404, detail=data.get("error"))

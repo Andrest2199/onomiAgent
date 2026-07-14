@@ -1,14 +1,30 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
 
 
-# 1. Definimos la estructura interna de agent_config
+# Definimos la estructura interna de agent_config
 class AgentConfig(BaseModel):
-    docs: List[str]
-    apis: List[str]
-    agent: List[str]
+    model_config = ConfigDict(extra="forbid")
 
+    agent_name: str = "ONOMI"
+    language: str = "español"
+    voice:  Optional[str] = "nova"
+    tone: Optional[str] = ""
+    docs: List[str] = Field(default_factory=list)
+    apis: List[str] = Field(default_factory=list)
 
+    @field_validator("agent_name", "language")
+    @classmethod
+    def check_config_text(cls, value, info):
+        if not isinstance(value, str):
+            raise TypeError(
+                f"{info.field_name.capitalize().replace('_', ' ')} debe ser enviado como cadena de texto"
+            )
+        if not value.strip():
+            raise ValueError(f"El campo '{info.field_name}' no puede estar vacío")
+        return value
+
+# Definimos la estructura del request al endpoint onomi
 class ONOMIRequest(BaseModel):
     compania_id: str
     compania_name: str
@@ -45,8 +61,6 @@ class ONOMIRequest(BaseModel):
                 raise TypeError(
                     f"{field_name.capitalize().replace('_', ' ')} debe ser enviado como AgentConfig"
                 )
-            if not value.docs and not value.apis and not value.agent:
-                raise ValueError(f"El campo '{field_name}' no puede estar vacío")
             return value
 
         if not isinstance(value, str):

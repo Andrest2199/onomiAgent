@@ -1,74 +1,91 @@
-import os
 from openai import OpenAI
-from dotenv import load_dotenv
+from settings import settings
 
-# Carga .env
-load_dotenv()
 
-# Configuramos las variables de entorno
-api_key = os.environ.get("OPENAI_API_KEY")
-org_id = os.environ.get("OPENAI_ORG_ID")
+client = OpenAI(
+    api_key=settings.OPENAI_API_KEY,
+    organization=settings.ORG_ID,
+    project=settings.PROJECT,
+)
 
-def retrieve_annotation(client,thread_id,message_id):
+
+def get_value(value, key, default=None):
+    if isinstance(value, dict):
+        return value.get(key, default)
+    return getattr(value, key, default)
+
+
+def extract_text_and_references(content):
+    if isinstance(content, str):
+        return content, []
+
+    text_parts = []
+    references = []
+    seen_references = set()
+
+    for part in content or []:
+        text = get_value(part, "text", "")
+        if text:
+            text_parts.append(text)
+
+        for annotation in get_value(part, "annotations", []) or []:
+            filename = get_value(annotation, "filename")
+            url = get_value(annotation, "url")
+            reference = filename or url
+
+            if reference and reference not in seen_references:
+                seen_references.add(reference)
+                references.append(reference)
+
+    return "".join(text_parts), references
+
+
+def format_message(item):
+    if get_value(item, "type") != "message":
+        return None
+
+    role = get_value(item, "role")
+    if role not in {"user", "assistant"}:
+        return None
+
+    text, references = extract_text_and_references(get_value(item, "content", []))
+    if not text:
+        return None
+
+    message = {
+        "id": get_value(item, "id"),
+        "role": role,
+        "content": text,
+    }
+    if references:
+        message["references"] = references
+
+    return message
+
+
+def retrieve_messages_thread(conversation_id):
     """
-    Recupera las referencias a archivos.
+    Recupera los mensajes de una conversación de la Responses API.
     """
-    unique_citations = {}
-    citations = []
-    citation_index = 1
-    # Retrieve the message object
-    message = client.beta.threads.messages.retrieve(thread_id=thread_id,message_id=message_id)
-    # Extract the message and the annotation
-    message_content = message.content[0].text.value
-    annotations = message.content[0].text.annotations
-    # Iterate over the annotations and add footnotes
-    for annotation in annotations:
-        # Check if the annotation text already has a citation to avoid duplicates
-        citation_text = annotation.text
-        # Determine the source of the citation
-        if (file_citation := getattr(annotation, 'file_citation', None)):
-            file_id = file_citation.file_id
-            try:
-                cited_file = client.files.retrieve(file_id)
-                filename = cited_file.filename
-            except Exception as e:
-                print(f"Error retrieving file {file_id}: {e}")
-                filename = file_id
-        elif (file_path := getattr(annotation, 'file_path', None)):
-            file_id = file_path.file_id
-            try:
-                cited_file = client.files.retrieve(file_id)
-                filename = cited_file.filename
-            except Exception as e:
-                print(f"Error retrieving file {file_id}: {e}")
-                filename = file_id
-        else:
-            continue
-
-        # Only add citation if it is unique
-        if filename not in unique_citations:
-            # Add to unique citations and append citation text with index
-            unique_citations[filename] = citation_index
-            citations.append(f'[{citation_index}] Fuente: {filename}')
-            citation_index += 1  # Increment the citation index for the next unique file
-        # Replace annotation text in the message content with the correct index
-        message_content = message_content.replace(citation_text, f' [{unique_citations[filename]}]')
-        # Note: File download functionality not implemented above for brevity
-    if citations:
-        message_content += "\n\nReferencias:\n" + "\n".join(citations)
-    
-    return message_content
-
-def retrieve_messages_thread(thread_id):
-    """
-    Recupera todos los mensajes en un thread, agregando anotaciones y referencias.
-    """
-    client = OpenAI(organization=org_id,api_key=api_key)
     response = {}
     try:
-        messages = client.beta.threads.messages.list(thread_id)
+        items = client.conversations.items.list(
+            conversation_id=conversation_id,
+            limit=100,
+            order="asc",
+        )
+
+        messages = [
+            message
+            for item in getattr(items, "data", [])
+            if (message := format_message(item)) is not None
+        ]
+
+        response["conversation_id"] = conversation_id
+        response["messages"] = messages
+
         for index, message in enumerate(messages):
-            response[index] = {message.role: retrieve_annotation(client, thread_id, message.id)}
+            response[index] = {message["role"]: message["content"]}
     except Exception as e:
         return {"error": str(e)}
     return response
