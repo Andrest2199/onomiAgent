@@ -1,1 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pytest_cache/
+.pytest_cache/
+# Virtual environments
+venv/
+.env/
+.venv/
+ENV/
+env/
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*~
+# OS files
+.DS_Store
+Thumbs.db
+# FastAPI / Python logs and runtime files
+*.log
+*.sqlite3
+instance/
+.pyenv
+# Secrets and API keys
 .env
+.env.local
+.env.*
+secrets.yml
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+.cache/
+.pytest_cache/
+.coverage
+coverage.xml
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+# If using Docker
+docker-compose.override.yml
+# Local settings
+local_settings.py

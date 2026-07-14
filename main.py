@@ -8,7 +8,7 @@ from models import ONOMIRequest
 app = FastAPI(
     title="ONOMI Assistant API",
     description="API para interactuar con el asistente de RRHH.",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 @app.post("/onomi")
