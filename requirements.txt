@@ -1,0 +1,6 @@
+fastapi
+openai>=1.109.0
+pydantic-settings
+python-dotenv
+python-multipart
+uvicorn
