@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from models import ONOMIRequest
 from settings import settings
 
@@ -29,14 +30,15 @@ async def onomi(request: ONOMIRequest):
         from assistant import onomi_assistant
 
         # Llama la función principal con los datos del request
-        data = onomi_assistant(
+        data = await run_in_threadpool(
+            onomi_assistant,
             request.compania_id,
             request.compania_name,
             request.id_employee,
             request.permission_type,
             request.question,
             request.agent_config,
-            request.previous_conversation_id
+            request.previous_conversation_id,
         )
         return data
 

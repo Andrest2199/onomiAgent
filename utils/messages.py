@@ -63,25 +63,61 @@ def format_message(item):
     return message
 
 
+def get_conversation(conversation_id):
+    try:
+        return client.conversations.retrieve(conversation_id=conversation_id)
+    except TypeError:
+        return client.conversations.retrieve(conversation_id)
+
+
+def get_conversation_metadata(conversation_id):
+    conversation = get_conversation(conversation_id)
+    return get_value(conversation, "metadata", {}) or {}
+
+
+def get_conversation_chain(conversation_id):
+    chain = []
+    seen = set()
+    current_id = conversation_id
+
+    while current_id and current_id not in seen:
+        seen.add(current_id)
+        chain.append(current_id)
+
+        metadata = get_conversation_metadata(current_id)
+        current_id = metadata.get("previous_conversation_id")
+
+    return list(reversed(chain))
+
+
+def get_conversation_messages(conversation_id):
+    items = client.conversations.items.list(
+        conversation_id=conversation_id,
+        limit=25,
+        order="asc",
+    )
+    print(items)
+
+    return [
+        message
+        for item in getattr(items, "data", [])
+        if (message := format_message(item)) is not None
+    ]
+
+
 def retrieve_messages_thread(conversation_id):
     """
-    Recupera los mensajes de una conversación de la Responses API.
+    Recupera los mensajes de una conversación de Responses API.
     """
     response = {}
     try:
-        items = client.conversations.items.list(
-            conversation_id=conversation_id,
-            limit=100,
-            order="asc",
-        )
-
-        messages = [
-            message
-            for item in getattr(items, "data", [])
-            if (message := format_message(item)) is not None
-        ]
+        conversation_ids = get_conversation_chain(conversation_id)
+        messages = []
+        for current_id in conversation_ids:
+            messages.extend(get_conversation_messages(current_id))
 
         response["conversation_id"] = conversation_id
+        response["conversation_ids"] = conversation_ids
         response["messages"] = messages
 
         for index, message in enumerate(messages):
